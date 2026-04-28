@@ -383,6 +383,14 @@ function generateProposalHTML(d) {
 }
 
 // ===== PDF Download =====
+// jsPDF helvetica uses Latin-1/WinAnsi — strip characters outside that range
+function pdfSafe(text) {
+  return text
+    .replace(/→/g, '->')
+    .replace(/←/g, '<-')
+    .replace(/[^\x00-\xFF]/g, '');
+}
+
 downloadPdfBtn.addEventListener('click', () => {
   const d = currentProposalData;
   if (!d.projectTitle) { showToast('No proposal to export', 'error'); return; }
@@ -405,7 +413,7 @@ downloadPdfBtn.addEventListener('click', () => {
     doc.setFontSize(size);
     doc.setTextColor(color || '#000000');
     doc.setFont('helvetica', 'bold');
-    doc.text(text, margin, y);
+    doc.text(pdfSafe(text), margin, y);
     y += size + 8;
   }
 
@@ -413,7 +421,7 @@ downloadPdfBtn.addEventListener('click', () => {
     doc.setFontSize(11);
     doc.setTextColor('#333333');
     doc.setFont('helvetica', 'normal');
-    const lines = doc.splitTextToSize(text, pageW);
+    const lines = doc.splitTextToSize(pdfSafe(text), pageW);
     lines.forEach(line => { checkPage(16); doc.text(line, margin, y); y += 15; });
     y += 6;
   }
@@ -422,8 +430,8 @@ downloadPdfBtn.addEventListener('click', () => {
     doc.setFontSize(11);
     doc.setTextColor('#333333');
     doc.setFont('helvetica', 'normal');
-    const lines = doc.splitTextToSize(text, pageW - 20);
-    lines.forEach((line, i) => { checkPage(16); doc.text(i === 0 ? '•  ' + line : '    ' + line, margin, y); y += 15; });
+    const lines = doc.splitTextToSize(pdfSafe(text), pageW - 20);
+    lines.forEach((line, i) => { checkPage(16); doc.text(i === 0 ? '-  ' + line : '   ' + line, margin, y); y += 15; });
   }
 
   addHeading(d.projectTitle, 20, '#1e293b');
@@ -467,7 +475,7 @@ downloadPdfBtn.addEventListener('click', () => {
     y += 4;
     addHeading('7. Compliance & Submission Checklist', 14, '#4f46e5');
     addParagraph(`Key requirements for submitting to ${agency.name}:`);
-    agency.compliance.forEach(item => addBullet(`☐  ${item}`));
+    agency.compliance.forEach(item => addBullet(`[ ]  ${pdfSafe(item)}`));
   }
 
   doc.save(`${d.projectTitle.replace(/\s+/g, '_')}_Proposal.pdf`);
