@@ -124,6 +124,7 @@
               <div class="step-header">
                 <h2>Budget Allocation</h2>
                 <p>Adjust the sliders to customize your budget breakdown.</p>
+                <button type="button" id="normalize-btn" class="btn-ghost">Auto-Balance</button>
               </div>
               <div class="budget-sliders" id="budget-sliders">
                 <div class="slider-group">
@@ -215,8 +216,12 @@
           <!-- Result State -->
           <div class="result-state hidden" id="result-state">
             <div class="result-header">
-              <h2>Generated Proposal</h2>
+              <div class="result-title">
+                <h2>Generated Proposal</h2>
+                <span class="word-count" id="word-count"></span>
+              </div>
               <div class="action-buttons">
+                <button class="btn-ghost" id="new-proposal-btn">↺ New</button>
                 <button class="btn-icon-only" id="download-md-btn" title="Download Markdown">
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 </button>

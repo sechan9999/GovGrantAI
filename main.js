@@ -23,14 +23,38 @@ let currentProposalData = {};
 
 // ===== Agency Templates =====
 const AGENCY_TEMPLATES = {
-  NSF: { name: 'National Science Foundation', focus: 'scientific research and education', criteria: 'intellectual merit and broader impacts' },
-  NIH: { name: 'National Institutes of Health', focus: 'biomedical and public health research', criteria: 'significance, innovation, and feasibility' },
-  DOE: { name: 'Department of Energy', focus: 'energy innovation and national security', criteria: 'technical merit and energy impact' },
-  ED: { name: 'Department of Education', focus: 'educational improvement and access', criteria: 'need, quality of design, and significance' },
-  DARPA: { name: 'Defense Advanced Research Projects', focus: 'breakthrough technologies for national security', criteria: 'technical innovation and transformative potential' },
-  USDA: { name: 'US Department of Agriculture', focus: 'agricultural research and rural development', criteria: 'relevance to USDA priorities and scientific merit' },
-  EPA: { name: 'Environmental Protection Agency', focus: 'environmental protection and sustainability', criteria: 'environmental impact and scientific rigor' },
-  SBA: { name: 'Small Business Innovation Research', focus: 'small business R&D commercialization', criteria: 'innovation, commercial potential, and team capability' },
+  NSF: {
+    name: 'National Science Foundation', focus: 'scientific research and education', criteria: 'intellectual merit and broader impacts',
+    compliance: ['Data Management Plan (DMP) required', 'Postdoctoral Mentoring Plan (if applicable)', 'Human Subjects / IRB approval (if applicable)', 'FastLane or Research.gov submission portal', '2-page Project Summary with overview, intellectual merit, and broader impacts', 'Authorized Organizational Representative (AOR) certification required']
+  },
+  NIH: {
+    name: 'National Institutes of Health', focus: 'biomedical and public health research', criteria: 'significance, innovation, and feasibility',
+    compliance: ['IRB approval / Human Subjects Protection Plan', 'IACUC approval required for animal studies', 'eRA Commons account registration required', 'SF424 (R&R) application forms via Grants.gov', 'Facilities & Other Resources section required', 'Authentication Plan for Key Biological Resources']
+  },
+  DOE: {
+    name: 'Department of Energy', focus: 'energy innovation and national security', criteria: 'technical merit and energy impact',
+    compliance: ['PAMS (Portfolio Analysis Management System) registration', 'Foreign National Access Plan if applicable', 'Data Management Plan compliant with DOE/OSTI standards', 'Export Control compliance certification', 'Security review for sensitive/dual-use technologies', 'Environmental impact assessment as needed']
+  },
+  ED: {
+    name: 'Department of Education', focus: 'educational improvement and access', criteria: 'need, quality of design, and significance',
+    compliance: ['Grants.gov submission using SF-424 forms', 'GEPA Section 427 compliance statement required', 'Alignment with absolute and competitive funding priorities', 'Logic model demonstrating program theory of change', 'Rigorous evaluation design (experimental preferred)', 'FERPA and Privacy Act compliance certification']
+  },
+  DARPA: {
+    name: 'Defense Advanced Research Projects Agency', focus: 'breakthrough technologies for national security', criteria: 'technical innovation and transformative potential',
+    compliance: ['SAM.gov active registration required', 'Broad Agency Announcement (BAA) alignment documentation', 'ITAR/EAR export control review and certification', 'IP and Data Rights clauses per DFARS 252.227', 'Security clearance requirements assessment', 'Detailed technical performance milestones and metrics']
+  },
+  USDA: {
+    name: 'US Department of Agriculture', focus: 'agricultural research and rural development', criteria: 'relevance to USDA priorities and scientific merit',
+    compliance: ['Grants.gov submission with eAuthentication', 'USDA nondiscrimination statement required', 'Civil Rights compliance (Title VI, VII, IX)', 'Tribal consultation documentation if applicable', 'Rural development impact statement', 'Food safety and regulatory alignment documentation']
+  },
+  EPA: {
+    name: 'Environmental Protection Agency', focus: 'environmental protection and sustainability', criteria: 'environmental impact and scientific rigor',
+    compliance: ['Quality Assurance Project Plan (QAPP) required', 'NEPA environmental review compliance', 'SAM.gov active registration required', 'Grants.gov SF-424 submission', 'Considerations for minority/disadvantaged communities', 'EPA data quality and peer review standards compliance']
+  },
+  SBA: {
+    name: 'Small Business Innovation Research Program', focus: 'small business R&D commercialization', criteria: 'innovation, commercial potential, and team capability',
+    compliance: ['Small Business concern eligibility verified (< 500 employees)', 'PI primarily employed by applicant organization', 'Registration in SBIR.gov portal required', 'Phase I → Phase II commercialization pathway defined', 'Commercialization Plan with market size and revenue projections', 'Certification of business ownership and employment']
+  },
 };
 
 // ===== Toast System =====
@@ -63,8 +87,31 @@ function updateWizard() {
   if (currentStep === 4) drawBudgetChart();
 }
 
+function validateStep(step) {
+  if (step === 1) {
+    if (!document.getElementById('orgName').value.trim()) { showToast('Organization Name is required.', 'error'); return false; }
+    if (!document.getElementById('pastPerformance').value.trim()) { showToast('Past Performance is required.', 'error'); return false; }
+  }
+  if (step === 2) {
+    if (!document.getElementById('projectTitle').value.trim()) { showToast('Project Title is required.', 'error'); return false; }
+    if (!document.getElementById('fundingAmount').value || parseFloat(document.getElementById('fundingAmount').value) <= 0) { showToast('Enter a valid Funding Amount.', 'error'); return false; }
+    if (!document.getElementById('grantAgency').value) { showToast('Please select a Target Agency.', 'error'); return false; }
+  }
+  if (step === 3) {
+    if (!document.getElementById('objectives').value.trim()) { showToast('Core Objectives are required.', 'error'); return false; }
+  }
+  if (step === 4) {
+    const total = getBudgetValues().reduce((a, b) => a + b, 0);
+    if (total !== 100) { showToast(`Budget totals ${total}% — tap Auto-Balance to fix.`, 'error'); return false; }
+  }
+  return true;
+}
+
 prevBtn.addEventListener('click', () => { if (currentStep > 1) { currentStep--; updateWizard(); } });
-nextBtn.addEventListener('click', () => { if (currentStep < totalSteps) { currentStep++; updateWizard(); } });
+nextBtn.addEventListener('click', () => {
+  if (!validateStep(currentStep)) return;
+  if (currentStep < totalSteps) { currentStep++; updateWizard(); }
+});
 
 // ===== Budget Sliders =====
 const sliderIds = ['budget-personnel', 'budget-equipment', 'budget-operations', 'budget-evaluation'];
@@ -91,13 +138,29 @@ function updateBudgetTotal() {
   el.style.color = total === 100 ? 'var(--accent-success)' : 'var(--accent-danger)';
 }
 
+function normalizeBudget() {
+  const values = getBudgetValues();
+  const total = values.reduce((a, b) => a + b, 0) || 100;
+  const normalized = values.map(v => Math.round((v / total) * 100));
+  const diff = 100 - normalized.reduce((a, b) => a + b, 0);
+  normalized[0] += diff;
+  sliderIds.forEach((id, i) => {
+    document.getElementById(id).value = normalized[i];
+    document.getElementById(valueIds[i]).textContent = `${normalized[i]}%`;
+  });
+  updateBudgetTotal();
+  drawBudgetChart();
+  showToast('Budget balanced to 100%!', 'success');
+}
+
+document.getElementById('normalize-btn').addEventListener('click', normalizeBudget);
+
 function drawBudgetChart() {
   const canvas = document.getElementById('budget-chart');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const values = getBudgetValues();
   const colors = ['#6366f1', '#d946ef', '#38bdf8', '#22c55e'];
-  const labels = ['Personnel', 'Equipment', 'Operations', 'Evaluation'];
   const total = values.reduce((a, b) => a + b, 0) || 1;
   const cx = 100, cy = 100, r = 80, ir = 50;
 
@@ -113,7 +176,6 @@ function drawBudgetChart() {
     ctx.fillStyle = colors[i];
     ctx.fill();
 
-    // Label
     const midAngle = startAngle + sliceAngle / 2;
     const lx = cx + (r + 2) * 0.68 * Math.cos(midAngle);
     const ly = cy + (r + 2) * 0.68 * Math.sin(midAngle);
@@ -126,7 +188,6 @@ function drawBudgetChart() {
     startAngle += sliceAngle;
   });
 
-  // Center text
   ctx.fillStyle = '#94a3b8';
   ctx.font = '500 11px Inter';
   ctx.textAlign = 'center';
@@ -161,8 +222,50 @@ sampleBtn.addEventListener('click', () => {
   document.getElementById('projectDuration').value = '24';
   document.getElementById('objectives').value = '1. Deploy AI diagnostic tools to 50 rural clinics\n2. Reduce diagnostic latency by 40%\n3. Train 200 healthcare professionals';
   document.getElementById('methodology').value = 'Multi-phase approach: stakeholder mapping, AI model deployment, clinical training workshops, iterative evaluation with control groups.';
+  syncCharCounters();
   showToast('Sample data loaded!', 'success');
 });
+
+// ===== Char Counters =====
+const CHAR_LIMITS = [['pastPerformance', 500], ['objectives', 800], ['methodology', 600]];
+
+function setupCharCounters() {
+  CHAR_LIMITS.forEach(([id, max]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const counter = document.createElement('div');
+    counter.className = 'char-counter';
+    counter.id = `counter-${id}`;
+    counter.textContent = `0 / ${max}`;
+    el.parentNode.appendChild(counter);
+    el.addEventListener('input', () => {
+      const len = el.value.length;
+      counter.textContent = `${len} / ${max}`;
+      counter.classList.toggle('over', len > max);
+    });
+  });
+}
+
+function syncCharCounters() {
+  CHAR_LIMITS.forEach(([id, max]) => {
+    const el = document.getElementById(id);
+    const counter = document.getElementById(`counter-${id}`);
+    if (el && counter) {
+      const len = el.value.length;
+      counter.textContent = `${len} / ${max}`;
+      counter.classList.toggle('over', len > max);
+    }
+  });
+}
+
+// ===== Word Count =====
+function updateWordCount(html) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  const count = tmp.innerText.trim().split(/\s+/).filter(Boolean).length;
+  const el = document.getElementById('word-count');
+  if (el) el.textContent = `${count.toLocaleString()} words`;
+}
 
 // ===== History (localStorage) =====
 function loadHistory() {
@@ -180,6 +283,7 @@ function loadHistory() {
       const h = history[idx];
       currentProposalData = h;
       documentContent.innerHTML = generateProposalHTML(h);
+      updateWordCount(documentContent.innerHTML);
       emptyState.classList.add('hidden');
       resultState.classList.remove('hidden');
       showToast('Loaded from history', 'info');
@@ -199,11 +303,12 @@ const LOADING_STEPS = [
   'Analyzing agency requirements...', 'Structuring Executive Summary...',
   'Drafting Statement of Need...', 'Formulating Methodology...',
   'Calculating Budget Narrative...', 'Building Evaluation Plan...',
-  'Compiling Organizational Background...', 'Formatting final document...'
+  'Compiling Organizational Background...', 'Generating Compliance Checklist...'
 ];
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
+  if (!validateStep(4)) return;
   const budgetVals = getBudgetValues();
   currentProposalData = {
     orgName: document.getElementById('orgName').value,
@@ -229,6 +334,7 @@ form.addEventListener('submit', async (e) => {
   }
 
   documentContent.innerHTML = generateProposalHTML(currentProposalData);
+  updateWordCount(documentContent.innerHTML);
   loadingState.classList.add('hidden');
   resultState.classList.remove('hidden');
   generateBtn.disabled = false;
@@ -240,7 +346,7 @@ form.addEventListener('submit', async (e) => {
 // ===== Proposal Generator =====
 function generateProposalHTML(d) {
   const amt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(d.fundingAmount);
-  const agency = AGENCY_TEMPLATES[d.grantAgency] || { name: d.grantAgency, focus: 'federal programs', criteria: 'merit and impact' };
+  const agency = AGENCY_TEMPLATES[d.grantAgency] || { name: d.grantAgency, focus: 'federal programs', criteria: 'merit and impact', compliance: [] };
   const b = d.budget || { personnel: 45, equipment: 25, operations: 20, evaluation: 10 };
   const dur = d.projectDuration || 24;
   const p1End = Math.round(dur * 0.2), p2End = Math.round(dur * 0.75);
@@ -264,17 +370,26 @@ function generateProposalHTML(d) {
   sections.forEach((s, i) => {
     html += `<div class="doc-section" style="animation-delay:${i * 0.1}s"><h3>${s.t}</h3>${s.c}</div>`;
   });
+
+  if (agency.compliance && agency.compliance.length) {
+    html += `<div class="doc-section compliance-section" style="animation-delay:${sections.length * 0.1}s">
+      <h3>7. Compliance & Submission Checklist</h3>
+      <p>Key requirements for submitting to <strong>${agency.name}</strong>. Use this checklist before final submission:</p>
+      <ul class="compliance-list">${agency.compliance.map(item => `<li><span class="check-box">☐</span>${item}</li>`).join('')}</ul>
+    </div>`;
+  }
+
   return html + '</div>';
 }
 
-// ===== PDF Download (jsPDF — no html2canvas!) =====
+// ===== PDF Download =====
 downloadPdfBtn.addEventListener('click', () => {
   const d = currentProposalData;
   if (!d.projectTitle) { showToast('No proposal to export', 'error'); return; }
 
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const amt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(d.fundingAmount);
-  const agency = AGENCY_TEMPLATES[d.grantAgency] || { name: d.grantAgency };
+  const agency = AGENCY_TEMPLATES[d.grantAgency] || { name: d.grantAgency, compliance: [] };
   const b = d.budget || { personnel: 45, equipment: 25, operations: 20, evaluation: 10 };
   const dur = d.projectDuration || 24;
   const margin = 60;
@@ -311,14 +426,12 @@ downloadPdfBtn.addEventListener('click', () => {
     lines.forEach((line, i) => { checkPage(16); doc.text(i === 0 ? '•  ' + line : '    ' + line, margin, y); y += 15; });
   }
 
-  // Title
   addHeading(d.projectTitle, 20, '#1e293b');
   doc.setFontSize(10); doc.setTextColor('#64748b'); doc.setFont('helvetica', 'normal');
   doc.text(`Applicant: ${d.orgName}  |  Agency: ${agency.name}  |  Funding: ${amt}`, margin, y);
   y += 12;
   doc.setDrawColor('#e2e8f0'); doc.line(margin, y, 612 - margin, y); y += 20;
 
-  // Sections
   addHeading('1. Executive Summary', 14, '#4f46e5');
   addParagraph(`${d.orgName} is seeking ${amt} from the ${agency.name} to fund the "${d.projectTitle}" project over ${dur} months. This initiative supports the agency's mission and will deliver measurable outcomes.`);
 
@@ -350,6 +463,13 @@ downloadPdfBtn.addEventListener('click', () => {
   addParagraph(`${d.orgName} has a proven track record managing federal initiatives.`);
   d.pastPerformance.split('\n').filter(Boolean).forEach(p => addBullet(p.replace(/^-\s*/, '')));
 
+  if (agency.compliance && agency.compliance.length) {
+    y += 4;
+    addHeading('7. Compliance & Submission Checklist', 14, '#4f46e5');
+    addParagraph(`Key requirements for submitting to ${agency.name}:`);
+    agency.compliance.forEach(item => addBullet(`☐  ${item}`));
+  }
+
   doc.save(`${d.projectTitle.replace(/\s+/g, '_')}_Proposal.pdf`);
   showToast('PDF downloaded!', 'success');
 });
@@ -359,8 +479,9 @@ downloadMdBtn.addEventListener('click', () => {
   const d = currentProposalData;
   if (!d.projectTitle) { showToast('No proposal to export', 'error'); return; }
   const amt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(d.fundingAmount);
-  const agency = AGENCY_TEMPLATES[d.grantAgency] || { name: d.grantAgency };
+  const agency = AGENCY_TEMPLATES[d.grantAgency] || { name: d.grantAgency, compliance: [] };
   const b = d.budget || { personnel: 45, equipment: 25, operations: 20, evaluation: 10 };
+  const complianceList = (agency.compliance || []).map(item => `- [ ] ${item}`).join('\n');
 
   const md = `# ${d.projectTitle}
 **Applicant:** ${d.orgName}
@@ -388,6 +509,7 @@ Mixed-methods evaluation measuring KPIs including engagement rates and milestone
 
 ## 6. Organizational Background
 ${d.pastPerformance}
+${complianceList ? `\n## 7. Compliance & Submission Checklist\n${complianceList}` : ''}
 `;
 
   const blob = new Blob([md], { type: 'text/markdown' });
@@ -404,7 +526,27 @@ copyBtn.addEventListener('click', () => {
   navigator.clipboard.writeText(documentContent.innerText).then(() => showToast('Copied to clipboard!', 'success'));
 });
 
+// ===== New Proposal =====
+document.getElementById('new-proposal-btn').addEventListener('click', () => {
+  currentStep = 1;
+  currentProposalData = {};
+  form.reset();
+  [['budget-personnel', 45], ['budget-equipment', 25], ['budget-operations', 20], ['budget-evaluation', 10]].forEach(([id, val]) => {
+    document.getElementById(id).value = val;
+  });
+  sliderIds.forEach((id, i) => {
+    document.getElementById(valueIds[i]).textContent = document.getElementById(id).value + '%';
+  });
+  updateBudgetTotal();
+  syncCharCounters();
+  resultState.classList.add('hidden');
+  emptyState.classList.remove('hidden');
+  updateWizard();
+  loadHistory();
+});
+
 // ===== Init =====
 updateWizard();
 updateBudgetTotal();
 loadHistory();
+setupCharCounters();
