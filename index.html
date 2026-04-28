@@ -3,13 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>GovAI - US Grant Proposal Generator</title>
-    <!-- SEO Best Practices -->
-    <meta name="description" content="Generate high-quality US government grant proposals instantly using AI. Build winning narratives with our state-of-the-art proposal generator." />
-    <!-- Modern Typography: Inter -->
+    <title>GovAI PRO — US Federal Grant Proposal Generator</title>
+    <meta name="description" content="Generate high-quality US government grant proposals instantly with AI. Tailored templates for NSF, NIH, DOE, DARPA, USDA, EPA & SBIR." />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
@@ -18,14 +16,18 @@
     <div class="bg-orb orb-2"></div>
     <div class="bg-orb orb-3"></div>
 
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
     <div class="app-container">
+      <!-- Header -->
       <header class="app-header">
         <div class="logo-container">
           <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="url(#gradient)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <defs>
               <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#4f46e5" />
-                <stop offset="100%" stop-color="#c026d3" />
+                <stop offset="0%" stop-color="#6366f1" />
+                <stop offset="100%" stop-color="#d946ef" />
               </linearGradient>
             </defs>
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
@@ -36,81 +38,165 @@
       </header>
 
       <main class="main-layout">
-        <!-- Left Panel: Input Form -->
+        <!-- ===== LEFT PANEL: Wizard ===== -->
         <section class="panel input-panel glass-card">
-          <div class="panel-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
-            <div>
-              <h2>Project Details</h2>
-              <p>Provide the core details of your initiative.</p>
-            </div>
-            <button type="button" id="sample-btn" class="btn-secondary" style="font-size: 0.8rem; padding: 0.5rem 1rem; border-radius: var(--radius-sm); background: var(--glass-highlight); border: 1px solid var(--glass-border); color: var(--text-primary); cursor: pointer; transition: var(--transition);">
-              Fill Sample Data
-            </button>
+          <!-- Wizard Progress -->
+          <div class="wizard-progress" id="wizard-progress">
+            <div class="wizard-step active" data-step="1"><span>1</span><small>Organization</small></div>
+            <div class="wizard-step" data-step="2"><span>2</span><small>Project</small></div>
+            <div class="wizard-step" data-step="3"><span>3</span><small>Objectives</small></div>
+            <div class="wizard-step" data-step="4"><span>4</span><small>Budget</small></div>
+            <div class="wizard-step" data-step="5"><span>5</span><small>Review</small></div>
           </div>
-          <form id="proposal-form" class="proposal-form">
-            <div class="form-group">
-              <label for="orgName">Organization Name</label>
-              <input type="text" id="orgName" placeholder="e.g., Nexus Innovations" required />
-            </div>
-            
-            <div class="form-group">
-              <label for="projectTitle">Project Title</label>
-              <input type="text" id="projectTitle" placeholder="e.g., Community Tech Access Initiative" required />
-            </div>
 
-            <div class="form-row">
-              <div class="form-group half">
-                <label for="fundingAmount">Requested Funding ($)</label>
-                <input type="number" id="fundingAmount" placeholder="e.g., 500000" required />
+          <form id="proposal-form" class="proposal-form" autocomplete="off">
+            <!-- Step 1: Organization -->
+            <div class="wizard-page active" id="step-1">
+              <div class="step-header">
+                <h2>Organization Details</h2>
+                <p>Tell us about your organization.</p>
+                <button type="button" id="sample-btn" class="btn-ghost">Fill Sample Data</button>
               </div>
-              <div class="form-group half">
-                <label for="grantAgency">Target Agency</label>
-                <select id="grantAgency" required>
-                  <option value="" disabled selected>Select Agency...</option>
-                  <option value="NSF">National Science Foundation (NSF)</option>
-                  <option value="NIH">National Institutes of Health (NIH)</option>
-                  <option value="DOE">Department of Energy (DOE)</option>
-                  <option value="ED">Department of Education (ED)</option>
-                  <option value="OTHER">Other / State Level</option>
-                </select>
+              <div class="form-group">
+                <label for="orgName">Organization Name</label>
+                <input type="text" id="orgName" placeholder="e.g., Nexus Health Innovations" required />
+              </div>
+              <div class="form-group">
+                <label for="pastPerformance">Past Performance / Track Record</label>
+                <textarea id="pastPerformance" rows="4" placeholder="Describe past grants managed, prior successes, institutional capabilities..." required></textarea>
               </div>
             </div>
 
-            <div class="form-group">
-              <label for="objectives">Core Objectives & Impact</label>
-              <textarea id="objectives" rows="3" placeholder="Briefly describe the problem you are solving and the measurable outcomes of this grant..." required></textarea>
+            <!-- Step 2: Project & Agency -->
+            <div class="wizard-page" id="step-2">
+              <div class="step-header">
+                <h2>Project & Agency</h2>
+                <p>Define your project and target agency.</p>
+              </div>
+              <div class="form-group">
+                <label for="projectTitle">Project Title</label>
+                <input type="text" id="projectTitle" placeholder="e.g., AI-Driven Diagnostic Accessibility Initiative" required />
+              </div>
+              <div class="form-row">
+                <div class="form-group half">
+                  <label for="fundingAmount">Requested Funding ($)</label>
+                  <input type="number" id="fundingAmount" placeholder="e.g., 1250000" required />
+                </div>
+                <div class="form-group half">
+                  <label for="grantAgency">Target Agency</label>
+                  <select id="grantAgency" required>
+                    <option value="" disabled selected>Select...</option>
+                    <option value="NSF">NSF — National Science Foundation</option>
+                    <option value="NIH">NIH — National Institutes of Health</option>
+                    <option value="DOE">DOE — Department of Energy</option>
+                    <option value="ED">ED — Department of Education</option>
+                    <option value="DARPA">DARPA — Defense Advanced Research</option>
+                    <option value="USDA">USDA — Agriculture</option>
+                    <option value="EPA">EPA — Environmental Protection</option>
+                    <option value="SBA">SBA/SBIR — Small Business Innovation</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="projectDuration">Project Duration (Months)</label>
+                <input type="number" id="projectDuration" value="24" min="6" max="60" />
+              </div>
             </div>
 
-            <div class="form-group">
-              <label for="pastPerformance">Past Performance / Track Record</label>
-              <textarea id="pastPerformance" rows="3" placeholder="Describe past successes, prior grants managed, or institutional capabilities..." required></textarea>
+            <!-- Step 3: Objectives -->
+            <div class="wizard-page" id="step-3">
+              <div class="step-header">
+                <h2>Objectives & Methodology</h2>
+                <p>Describe the core problem and your approach.</p>
+              </div>
+              <div class="form-group">
+                <label for="objectives">Core Objectives & Impact</label>
+                <textarea id="objectives" rows="4" placeholder="1. Deploy AI diagnostic tools to 50 rural clinics.&#10;2. Reduce diagnostic latency by 40%.&#10;3. Train 200 healthcare professionals." required></textarea>
+              </div>
+              <div class="form-group">
+                <label for="methodology">Methodology Summary</label>
+                <textarea id="methodology" rows="3" placeholder="Multi-phase approach with stakeholder engagement, technology deployment, training, and iterative evaluation..."></textarea>
+              </div>
             </div>
 
-            <button type="submit" class="btn-primary" id="generate-btn">
-              <span class="btn-text">Generate Proposal</span>
-              <svg class="btn-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
-              </svg>
-            </button>
+            <!-- Step 4: Budget -->
+            <div class="wizard-page" id="step-4">
+              <div class="step-header">
+                <h2>Budget Allocation</h2>
+                <p>Adjust the sliders to customize your budget breakdown.</p>
+              </div>
+              <div class="budget-sliders" id="budget-sliders">
+                <div class="slider-group">
+                  <div class="slider-label"><span>Personnel</span><span class="slider-value" id="val-personnel">45%</span></div>
+                  <input type="range" id="budget-personnel" min="0" max="100" value="45" />
+                </div>
+                <div class="slider-group">
+                  <div class="slider-label"><span>Equipment & Materials</span><span class="slider-value" id="val-equipment">25%</span></div>
+                  <input type="range" id="budget-equipment" min="0" max="100" value="25" />
+                </div>
+                <div class="slider-group">
+                  <div class="slider-label"><span>Operations & Logistics</span><span class="slider-value" id="val-operations">20%</span></div>
+                  <input type="range" id="budget-operations" min="0" max="100" value="20" />
+                </div>
+                <div class="slider-group">
+                  <div class="slider-label"><span>Evaluation & Reporting</span><span class="slider-value" id="val-evaluation">10%</span></div>
+                  <input type="range" id="budget-evaluation" min="0" max="100" value="10" />
+                </div>
+                <div class="budget-total" id="budget-total">
+                  <span>Total:</span>
+                  <span id="budget-total-value">100%</span>
+                </div>
+              </div>
+              <!-- Donut Chart -->
+              <div class="chart-container">
+                <canvas id="budget-chart" width="200" height="200"></canvas>
+              </div>
+            </div>
+
+            <!-- Step 5: Review -->
+            <div class="wizard-page" id="step-5">
+              <div class="step-header">
+                <h2>Review & Generate</h2>
+                <p>Confirm your details and generate the proposal.</p>
+              </div>
+              <div class="review-summary" id="review-summary">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+
+            <!-- Wizard Navigation -->
+            <div class="wizard-nav">
+              <button type="button" id="prev-btn" class="btn-outline" disabled>← Back</button>
+              <button type="button" id="next-btn" class="btn-primary">Next →</button>
+              <button type="submit" id="generate-btn" class="btn-primary hidden">
+                <span class="btn-text">Generate Proposal</span>
+                <svg class="btn-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </button>
+            </div>
           </form>
         </section>
 
-        <!-- Right Panel: Output & AI Generation -->
+        <!-- ===== RIGHT PANEL: Output ===== -->
         <section class="panel output-panel glass-card" id="output-panel">
           
           <!-- Empty State -->
           <div class="empty-state" id="empty-state">
             <div class="empty-icon-wrapper">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                 <polyline points="14 2 14 8 20 8"></polyline>
                 <line x1="16" y1="13" x2="8" y2="13"></line>
                 <line x1="16" y1="17" x2="8" y2="17"></line>
-                <polyline points="10 9 9 9 8 9"></polyline>
               </svg>
             </div>
             <h3>Ready to Generate</h3>
-            <p>Fill out the form to synthesize a comprehensive grant proposal.</p>
+            <p>Complete the wizard to synthesize a comprehensive grant proposal.</p>
+
+            <!-- Proposal History -->
+            <div class="history-section" id="history-section" style="display:none;">
+              <h4>Recent Proposals</h4>
+              <div id="history-list" class="history-list"></div>
+            </div>
           </div>
 
           <!-- Loading State -->
@@ -130,25 +216,27 @@
           <div class="result-state hidden" id="result-state">
             <div class="result-header">
               <h2>Generated Proposal</h2>
-              <div class="action-buttons" style="display: flex; gap: 0.5rem;">
+              <div class="action-buttons">
                 <button class="btn-icon-only" id="download-md-btn" title="Download Markdown">
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 </button>
                 <button class="btn-icon-only" id="download-pdf-btn" title="Download PDF">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                 </button>
                 <button class="btn-icon-only" id="copy-btn" title="Copy to Clipboard">
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                 </button>
               </div>
             </div>
-            <div class="document-content" id="document-content">
-              <!-- Content injected via JS -->
-            </div>
+            <div class="document-content" id="document-content"></div>
           </div>
-
         </section>
       </main>
+
+      <!-- Footer -->
+      <footer class="app-footer">
+        <p>GovAI PRO v2.0 · Built with ❤️ · <a href="https://github.com/sechan9999/GovGrantAI" target="_blank">GitHub</a></p>
+      </footer>
     </div>
     <script type="module" src="./main.js"></script>
   </body>

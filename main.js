@@ -1,5 +1,6 @@
-import html2pdf from 'html2pdf.js';
+import { jsPDF } from 'jspdf';
 
+// ===== DOM Elements =====
 const form = document.getElementById('proposal-form');
 const emptyState = document.getElementById('empty-state');
 const loadingState = document.getElementById('loading-state');
@@ -12,281 +13,398 @@ const generateBtn = document.getElementById('generate-btn');
 const sampleBtn = document.getElementById('sample-btn');
 const downloadMdBtn = document.getElementById('download-md-btn');
 const downloadPdfBtn = document.getElementById('download-pdf-btn');
+const prevBtn = document.getElementById('prev-btn');
+const nextBtn = document.getElementById('next-btn');
+const reviewSummary = document.getElementById('review-summary');
 
+let currentStep = 1;
+const totalSteps = 5;
 let currentProposalData = {};
 
+// ===== Agency Templates =====
+const AGENCY_TEMPLATES = {
+  NSF: { name: 'National Science Foundation', focus: 'scientific research and education', criteria: 'intellectual merit and broader impacts' },
+  NIH: { name: 'National Institutes of Health', focus: 'biomedical and public health research', criteria: 'significance, innovation, and feasibility' },
+  DOE: { name: 'Department of Energy', focus: 'energy innovation and national security', criteria: 'technical merit and energy impact' },
+  ED: { name: 'Department of Education', focus: 'educational improvement and access', criteria: 'need, quality of design, and significance' },
+  DARPA: { name: 'Defense Advanced Research Projects', focus: 'breakthrough technologies for national security', criteria: 'technical innovation and transformative potential' },
+  USDA: { name: 'US Department of Agriculture', focus: 'agricultural research and rural development', criteria: 'relevance to USDA priorities and scientific merit' },
+  EPA: { name: 'Environmental Protection Agency', focus: 'environmental protection and sustainability', criteria: 'environmental impact and scientific rigor' },
+  SBA: { name: 'Small Business Innovation Research', focus: 'small business R&D commercialization', criteria: 'innovation, commercial potential, and team capability' },
+};
+
+// ===== Toast System =====
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(100px)'; setTimeout(() => toast.remove(), 300); }, 3000);
+}
+
+// ===== Wizard Navigation =====
+function updateWizard() {
+  document.querySelectorAll('.wizard-page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`step-${currentStep}`).classList.add('active');
+
+  document.querySelectorAll('.wizard-step').forEach(s => {
+    const step = parseInt(s.dataset.step);
+    s.classList.remove('active', 'completed');
+    if (step === currentStep) s.classList.add('active');
+    else if (step < currentStep) s.classList.add('completed');
+  });
+
+  prevBtn.disabled = currentStep === 1;
+  nextBtn.classList.toggle('hidden', currentStep === totalSteps);
+  generateBtn.classList.toggle('hidden', currentStep !== totalSteps);
+
+  if (currentStep === totalSteps) populateReview();
+  if (currentStep === 4) drawBudgetChart();
+}
+
+prevBtn.addEventListener('click', () => { if (currentStep > 1) { currentStep--; updateWizard(); } });
+nextBtn.addEventListener('click', () => { if (currentStep < totalSteps) { currentStep++; updateWizard(); } });
+
+// ===== Budget Sliders =====
+const sliderIds = ['budget-personnel', 'budget-equipment', 'budget-operations', 'budget-evaluation'];
+const valueIds = ['val-personnel', 'val-equipment', 'val-operations', 'val-evaluation'];
+
+sliderIds.forEach((id, i) => {
+  document.getElementById(id).addEventListener('input', () => {
+    const val = document.getElementById(id).value;
+    document.getElementById(valueIds[i]).textContent = `${val}%`;
+    updateBudgetTotal();
+    drawBudgetChart();
+  });
+});
+
+function getBudgetValues() {
+  return sliderIds.map(id => parseInt(document.getElementById(id).value));
+}
+
+function updateBudgetTotal() {
+  const total = getBudgetValues().reduce((a, b) => a + b, 0);
+  const el = document.getElementById('budget-total-value');
+  el.textContent = `${total}%`;
+  el.classList.toggle('over', total !== 100);
+  el.style.color = total === 100 ? 'var(--accent-success)' : 'var(--accent-danger)';
+}
+
+function drawBudgetChart() {
+  const canvas = document.getElementById('budget-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const values = getBudgetValues();
+  const colors = ['#6366f1', '#d946ef', '#38bdf8', '#22c55e'];
+  const labels = ['Personnel', 'Equipment', 'Operations', 'Evaluation'];
+  const total = values.reduce((a, b) => a + b, 0) || 1;
+  const cx = 100, cy = 100, r = 80, ir = 50;
+
+  ctx.clearRect(0, 0, 200, 200);
+  let startAngle = -Math.PI / 2;
+
+  values.forEach((val, i) => {
+    const sliceAngle = (val / total) * 2 * Math.PI;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, startAngle, startAngle + sliceAngle);
+    ctx.arc(cx, cy, ir, startAngle + sliceAngle, startAngle, true);
+    ctx.closePath();
+    ctx.fillStyle = colors[i];
+    ctx.fill();
+
+    // Label
+    const midAngle = startAngle + sliceAngle / 2;
+    const lx = cx + (r + 2) * 0.68 * Math.cos(midAngle);
+    const ly = cy + (r + 2) * 0.68 * Math.sin(midAngle);
+    if (val > 5) {
+      ctx.fillStyle = '#fff';
+      ctx.font = '600 11px Inter';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${val}%`, lx, ly + 4);
+    }
+    startAngle += sliceAngle;
+  });
+
+  // Center text
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '500 11px Inter';
+  ctx.textAlign = 'center';
+  ctx.fillText('Budget', cx, cy - 4);
+  ctx.fillStyle = '#f8fafc';
+  ctx.font = '700 14px Inter';
+  ctx.fillText(`${total}%`, cx, cy + 14);
+}
+
+// ===== Review Summary =====
+function populateReview() {
+  const fields = [
+    ['Organization', document.getElementById('orgName').value],
+    ['Project', document.getElementById('projectTitle').value],
+    ['Funding', '$' + parseInt(document.getElementById('fundingAmount').value || 0).toLocaleString()],
+    ['Agency', document.getElementById('grantAgency').value],
+    ['Duration', (document.getElementById('projectDuration').value || 24) + ' months'],
+    ['Budget Split', getBudgetValues().join('% / ') + '%'],
+  ];
+  reviewSummary.innerHTML = fields.map(([k, v]) =>
+    `<div class="review-item"><strong>${k}</strong><span>${v || '—'}</span></div>`
+  ).join('');
+}
+
+// ===== Sample Data =====
+sampleBtn.addEventListener('click', () => {
+  document.getElementById('orgName').value = 'Nexus Health Innovations';
+  document.getElementById('pastPerformance').value = '- Managed $500k HRSA grant (2024) with zero compliance findings\n- Scaled telemedicine platform to 10,000+ patients\n- Partnered with 3 state health departments';
+  document.getElementById('projectTitle').value = 'AI-Driven Diagnostic Accessibility Initiative';
+  document.getElementById('fundingAmount').value = '1250000';
+  document.getElementById('grantAgency').value = 'NIH';
+  document.getElementById('projectDuration').value = '24';
+  document.getElementById('objectives').value = '1. Deploy AI diagnostic tools to 50 rural clinics\n2. Reduce diagnostic latency by 40%\n3. Train 200 healthcare professionals';
+  document.getElementById('methodology').value = 'Multi-phase approach: stakeholder mapping, AI model deployment, clinical training workshops, iterative evaluation with control groups.';
+  showToast('Sample data loaded!', 'success');
+});
+
+// ===== History (localStorage) =====
+function loadHistory() {
+  const history = JSON.parse(localStorage.getItem('govai_history') || '[]');
+  const section = document.getElementById('history-section');
+  const list = document.getElementById('history-list');
+  if (history.length === 0) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  list.innerHTML = history.slice(0, 5).map((h, i) =>
+    `<div class="history-item" data-index="${i}"><span class="title">${h.projectTitle}</span><span class="date">${new Date(h.timestamp).toLocaleDateString()}</span></div>`
+  ).join('');
+  list.querySelectorAll('.history-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const idx = parseInt(item.dataset.index);
+      const h = history[idx];
+      currentProposalData = h;
+      documentContent.innerHTML = generateProposalHTML(h);
+      emptyState.classList.add('hidden');
+      resultState.classList.remove('hidden');
+      showToast('Loaded from history', 'info');
+    });
+  });
+}
+
+function saveToHistory(data) {
+  const history = JSON.parse(localStorage.getItem('govai_history') || '[]');
+  history.unshift({ ...data, timestamp: Date.now() });
+  if (history.length > 10) history.pop();
+  localStorage.setItem('govai_history', JSON.stringify(history));
+}
+
+// ===== Form Submit =====
 const LOADING_STEPS = [
-  "Analyzing agency requirements and guidelines...",
-  "Structuring Executive Summary...",
-  "Drafting Statement of Need & Problem Context...",
-  "Formulating Methodology and Objectives...",
-  "Calculating Budget Narrative...",
-  "Finalizing Evaluation Plan..."
+  'Analyzing agency requirements...', 'Structuring Executive Summary...',
+  'Drafting Statement of Need...', 'Formulating Methodology...',
+  'Calculating Budget Narrative...', 'Building Evaluation Plan...',
+  'Compiling Organizational Background...', 'Formatting final document...'
 ];
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  
-  // Get Form Values
-  const orgName = document.getElementById('orgName').value;
-  const projectTitle = document.getElementById('projectTitle').value;
-  const fundingAmount = document.getElementById('fundingAmount').value;
-  const grantAgency = document.getElementById('grantAgency').value;
-  const objectives = document.getElementById('objectives').value;
-  const pastPerformance = document.getElementById('pastPerformance').value;
+  const budgetVals = getBudgetValues();
+  currentProposalData = {
+    orgName: document.getElementById('orgName').value,
+    projectTitle: document.getElementById('projectTitle').value,
+    fundingAmount: document.getElementById('fundingAmount').value,
+    grantAgency: document.getElementById('grantAgency').value,
+    objectives: document.getElementById('objectives').value,
+    pastPerformance: document.getElementById('pastPerformance').value,
+    methodology: document.getElementById('methodology').value || '',
+    projectDuration: document.getElementById('projectDuration').value || '24',
+    budget: { personnel: budgetVals[0], equipment: budgetVals[1], operations: budgetVals[2], evaluation: budgetVals[3] }
+  };
 
-  // Save for markdown export
-  currentProposalData = { orgName, projectTitle, fundingAmount, grantAgency, objectives, pastPerformance };
-
-  // UI Transitions
   emptyState.classList.add('hidden');
   resultState.classList.add('hidden');
   loadingState.classList.remove('hidden');
   generateBtn.disabled = true;
-  generateBtn.style.opacity = '0.5';
 
-  // Simulate AI Generation Process
-  await simulateAIGeneration();
+  for (let i = 0; i < LOADING_STEPS.length; i++) {
+    loadingStep.innerText = LOADING_STEPS[i];
+    progressBar.style.width = `${((i + 1) / LOADING_STEPS.length) * 100}%`;
+    await new Promise(r => setTimeout(r, 600 + Math.random() * 400));
+  }
 
-  // Generate Document
-  const generatedHTML = generateProposalDocument(orgName, projectTitle, fundingAmount, grantAgency, objectives, pastPerformance);
-  documentContent.innerHTML = generatedHTML;
-
-  // UI Transitions
+  documentContent.innerHTML = generateProposalHTML(currentProposalData);
   loadingState.classList.add('hidden');
   resultState.classList.remove('hidden');
   generateBtn.disabled = false;
-  generateBtn.style.opacity = '1';
+  saveToHistory(currentProposalData);
+  loadHistory();
+  showToast('Proposal generated successfully!', 'success');
 });
 
-async function simulateAIGeneration() {
-  const totalDuration = 6000; // 6 seconds simulation
-  const interval = totalDuration / LOADING_STEPS.length;
-  
-  for (let i = 0; i < LOADING_STEPS.length; i++) {
-    loadingStep.innerText = LOADING_STEPS[i];
-    const progress = ((i + 1) / LOADING_STEPS.length) * 100;
-    progressBar.style.width = `${progress}%`;
-    
-    // Staggered animation delay
-    await new Promise(resolve => setTimeout(resolve, interval + (Math.random() * 500 - 250)));
-  }
-  
-  loadingStep.innerText = "Formatting final document...";
-  await new Promise(resolve => setTimeout(resolve, 500));
-}
-
-function generateProposalDocument(org, title, amount, agency, objectives, pastPerformance) {
-  // Format currency
-  const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-  
-  const agencyNames = {
-    'NSF': 'National Science Foundation',
-    'NIH': 'National Institutes of Health',
-    'DOE': 'Department of Energy',
-    'ED': 'Department of Education',
-    'OTHER': 'Federal Grant Review Board'
-  };
-
-  const agencyFullName = agencyNames[agency] || 'Federal Agency';
+// ===== Proposal Generator =====
+function generateProposalHTML(d) {
+  const amt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(d.fundingAmount);
+  const agency = AGENCY_TEMPLATES[d.grantAgency] || { name: d.grantAgency, focus: 'federal programs', criteria: 'merit and impact' };
+  const b = d.budget || { personnel: 45, equipment: 25, operations: 20, evaluation: 10 };
+  const dur = d.projectDuration || 24;
+  const p1End = Math.round(dur * 0.2), p2End = Math.round(dur * 0.75);
+  const methodology = d.methodology || 'A structured multi-phase approach with stakeholder engagement, iterative implementation, and continuous evaluation.';
 
   const sections = [
-    {
-      title: "1. Executive Summary",
-      content: `<p><strong>${org}</strong> is seeking <strong>${formattedAmount}</strong> from the <strong>${agencyFullName}</strong> to fund the <strong>"${title}"</strong> project. This initiative aligns directly with the agency's strategic goals by addressing critical capability gaps. By leveraging innovative approaches, this project will deliver measurable outcomes, scaling impact efficiently across the target demographic.</p>`
-    },
-    {
-      title: "2. Statement of Need",
-      content: `<p>Currently, there is a pronounced deficit in resources addressing the challenges targeted by our initiative. The core issue requires immediate intervention. As outlined in our objectives:</p>
-                <p><em>"${objectives}"</em></p>
-                <p>Without targeted funding, these challenges will compound. Our proposal provides an evidence-based pathway to mitigate these issues and establish a sustainable framework for the future.</p>`
-    },
-    {
-      title: "3. Project Design and Methodology",
-      content: `<p>The <strong>${title}</strong> will be implemented in three phased stages over a 24-month performance period:</p>
-                <ul>
-                  <li><strong>Phase 1: Planning & Deployment (Months 1-4):</strong> Stakeholder engagement, infrastructure setup, and baseline metric establishment.</li>
-                  <li><strong>Phase 2: Execution & Scaling (Months 5-18):</strong> Direct implementation of core objectives, iterative feedback loops, and capability scaling.</li>
-                  <li><strong>Phase 3: Transition & Sustainability (Months 19-24):</strong> Knowledge transfer, final reporting, and institutionalizing the framework for post-grant sustainability.</li>
-                </ul>`
-    },
-    {
-      title: "4. Evaluation Plan",
-      content: `<p>A mixed-methods evaluation strategy will be employed. Formative assessments will guide continuous quality improvement during Phases 1 and 2. Summative evaluations will measure total impact against the baseline metrics. Key Performance Indicators (KPIs) include engagement rates, milestone completion percentage, and resource efficiency ratios.</p>`
-    },
-    {
-      title: "5. Budget Narrative",
-      content: `<p>The total requested budget of <strong>${formattedAmount}</strong> is meticulously calculated to ensure high ROI. The allocation is distributed as follows:</p>
-                <ul>
-                  <li><strong>Personnel (45%):</strong> Direct labor, project management, and specialized Subject Matter Experts (SMEs).</li>
-                  <li><strong>Equipment & Materials (25%):</strong> Essential technological infrastructure and implementation tools.</li>
-                  <li><strong>Operations & Logistics (20%):</strong> Deployment costs, outreach, and administrative overhead.</li>
-                  <li><strong>Evaluation & Reporting (10%):</strong> Independent assessment and compliance monitoring.</li>
-                </ul>`
-    },
-    {
-      title: "6. Organizational Background & Track Record",
-      content: `<p><strong>${org}</strong> has a proven history of executing complex initiatives and managing federal/state grants with strict compliance and outstanding results.</p>
-                <p><em>Past Performance Highlights:</em><br/>${pastPerformance.replace(/\n/g, '<br/>')}</p>
-                <p>Our institutional infrastructure provides robust financial controls and subject matter expertise to ensure the success of this proposed project.</p>`
-    }
+    { t: '1. Executive Summary', c: `<p><strong>${d.orgName}</strong> is seeking <strong>${amt}</strong> from the <strong>${agency.name}</strong> to fund the <strong>"${d.projectTitle}"</strong> project over ${dur} months. This initiative directly supports the agency's mission of ${agency.focus}. By leveraging innovative approaches, this project will deliver measurable outcomes evaluated against ${agency.criteria}.</p>` },
+    { t: '2. Statement of Need', c: `<p>There is a critical deficit in resources addressing the challenges targeted by this initiative. Without targeted funding, these challenges will compound. Our objectives:</p><p style="padding-left:15px;border-left:3px solid rgba(99,102,241,0.3);font-style:italic;margin:10px 0;">${d.objectives.replace(/\n/g, '<br/>')}</p><p>This proposal provides an evidence-based pathway to mitigate these issues.</p>` },
+    { t: '3. Project Design & Methodology', c: `<p>${methodology}</p><p>The project is structured in three phases over <strong>${dur} months</strong>:</p><ul><li><strong>Phase 1 (Months 1–${p1End}):</strong> Planning, stakeholder engagement, baseline metrics.</li><li><strong>Phase 2 (Months ${p1End + 1}–${p2End}):</strong> Core implementation, scaling, and feedback loops.</li><li><strong>Phase 3 (Months ${p2End + 1}–${dur}):</strong> Transition, sustainability planning, and knowledge transfer.</li></ul>` },
+    { t: '4. Evaluation Plan', c: `<p>A mixed-methods evaluation strategy aligned with ${agency.criteria}. Formative assessments during Phases 1–2 guide quality improvement. Summative evaluations measure total impact. KPIs: engagement rates, milestone completion, resource efficiency, and outcome metrics specific to ${agency.focus}.</p>` },
+    { t: '5. Budget Narrative', c: `<p>Total budget: <strong>${amt}</strong>, allocated for maximum ROI:</p><ul><li><strong>Personnel (${b.personnel}%):</strong> Project staff, SMEs, and management.</li><li><strong>Equipment & Materials (${b.equipment}%):</strong> Infrastructure and tools.</li><li><strong>Operations (${b.operations}%):</strong> Logistics, outreach, admin overhead.</li><li><strong>Evaluation (${b.evaluation}%):</strong> Independent assessment and compliance.</li></ul>` },
+    { t: '6. Organizational Background', c: `<p><strong>${d.orgName}</strong> has a proven track record managing federal initiatives with strict compliance.</p><p><strong>Past Performance:</strong><br/>${d.pastPerformance.replace(/\n/g, '<br/>')}</p><p>Our institutional infrastructure ensures the success of this project.</p>` }
   ];
 
   let html = `<div id="proposal-export-area">
-              <div class="doc-header" style="margin-bottom: 2rem; border-bottom: 2px solid var(--glass-border); padding-bottom: 1rem;">
-                <h1 style="font-size: 1.8rem; margin-bottom: 0.5rem; background: linear-gradient(90deg, var(--accent-primary), #fff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">${title}</h1>
-                <p style="color: var(--text-muted);"><strong>Applicant:</strong> ${org} | <strong>Target:</strong> ${agencyFullName}</p>
-              </div>`;
+    <div class="doc-section" style="animation-delay:0s;border-bottom:2px solid var(--glass-border);padding-bottom:1rem;margin-bottom:1.5rem;">
+      <h1 style="font-size:1.6rem;margin-bottom:0.4rem;background:linear-gradient(90deg,var(--accent-primary),#fff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">${d.projectTitle}</h1>
+      <p style="color:var(--text-muted)"><strong>Applicant:</strong> ${d.orgName} | <strong>Agency:</strong> ${agency.name} | <strong>Funding:</strong> ${amt}</p>
+    </div>`;
 
-  sections.forEach((sec, index) => {
-    html += `
-      <div class="doc-section" style="animation-delay: ${index * 0.1}s">
-        <h3>${sec.title}</h3>
-        ${sec.content}
-      </div>
-    `;
+  sections.forEach((s, i) => {
+    html += `<div class="doc-section" style="animation-delay:${i * 0.1}s"><h3>${s.t}</h3>${s.c}</div>`;
   });
-
-  html += `</div>`;
-  return html;
+  return html + '</div>';
 }
 
-// Event Listeners for New Functionality
+// ===== PDF Download (jsPDF — no html2canvas!) =====
+downloadPdfBtn.addEventListener('click', () => {
+  const d = currentProposalData;
+  if (!d.projectTitle) { showToast('No proposal to export', 'error'); return; }
 
-sampleBtn.addEventListener('click', () => {
-  document.getElementById('orgName').value = "Nexus Health Innovations";
-  document.getElementById('projectTitle').value = "AI-Driven Diagnostic Accessibility Initiative";
-  document.getElementById('fundingAmount').value = "1250000";
-  document.getElementById('grantAgency').value = "NIH";
-  document.getElementById('objectives').value = "1. Deploy AI diagnostic tools to 50 rural clinics.\n2. Reduce diagnostic latency by 40%.\n3. Train 200 healthcare professionals on the new platform.";
-  document.getElementById('pastPerformance').value = "- Successfully managed a $500k HRSA grant in 2024 with zero compliance findings.\n- Developed and scaled a telemedicine platform reaching 10,000+ patients.\n- Partnered with 3 state health departments for tech integration.";
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const amt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(d.fundingAmount);
+  const agency = AGENCY_TEMPLATES[d.grantAgency] || { name: d.grantAgency };
+  const b = d.budget || { personnel: 45, equipment: 25, operations: 20, evaluation: 10 };
+  const dur = d.projectDuration || 24;
+  const margin = 60;
+  const pageW = 612 - margin * 2;
+  let y = 60;
+
+  function checkPage(needed) {
+    if (y + needed > 720) { doc.addPage(); y = 60; }
+  }
+
+  function addHeading(text, size, color) {
+    checkPage(size + 10);
+    doc.setFontSize(size);
+    doc.setTextColor(color || '#000000');
+    doc.setFont('helvetica', 'bold');
+    doc.text(text, margin, y);
+    y += size + 8;
+  }
+
+  function addParagraph(text) {
+    doc.setFontSize(11);
+    doc.setTextColor('#333333');
+    doc.setFont('helvetica', 'normal');
+    const lines = doc.splitTextToSize(text, pageW);
+    lines.forEach(line => { checkPage(16); doc.text(line, margin, y); y += 15; });
+    y += 6;
+  }
+
+  function addBullet(text) {
+    doc.setFontSize(11);
+    doc.setTextColor('#333333');
+    doc.setFont('helvetica', 'normal');
+    const lines = doc.splitTextToSize(text, pageW - 20);
+    lines.forEach((line, i) => { checkPage(16); doc.text(i === 0 ? '•  ' + line : '    ' + line, margin, y); y += 15; });
+  }
+
+  // Title
+  addHeading(d.projectTitle, 20, '#1e293b');
+  doc.setFontSize(10); doc.setTextColor('#64748b'); doc.setFont('helvetica', 'normal');
+  doc.text(`Applicant: ${d.orgName}  |  Agency: ${agency.name}  |  Funding: ${amt}`, margin, y);
+  y += 12;
+  doc.setDrawColor('#e2e8f0'); doc.line(margin, y, 612 - margin, y); y += 20;
+
+  // Sections
+  addHeading('1. Executive Summary', 14, '#4f46e5');
+  addParagraph(`${d.orgName} is seeking ${amt} from the ${agency.name} to fund the "${d.projectTitle}" project over ${dur} months. This initiative supports the agency's mission and will deliver measurable outcomes.`);
+
+  addHeading('2. Statement of Need', 14, '#4f46e5');
+  addParagraph('There is a critical deficit in resources addressing the challenges targeted by this initiative. Our objectives:');
+  d.objectives.split('\n').filter(Boolean).forEach(o => addBullet(o.replace(/^\d+\.\s*/, '')));
+  y += 4;
+
+  addHeading('3. Project Design & Methodology', 14, '#4f46e5');
+  addParagraph(d.methodology || 'A structured multi-phase approach with stakeholder engagement and iterative evaluation.');
+  const p1 = Math.round(dur * 0.2), p2 = Math.round(dur * 0.75);
+  addBullet(`Phase 1 (Months 1-${p1}): Planning, stakeholder engagement, baseline metrics.`);
+  addBullet(`Phase 2 (Months ${p1 + 1}-${p2}): Core implementation and scaling.`);
+  addBullet(`Phase 3 (Months ${p2 + 1}-${dur}): Transition and sustainability.`);
+  y += 4;
+
+  addHeading('4. Evaluation Plan', 14, '#4f46e5');
+  addParagraph('A mixed-methods evaluation strategy will be employed. KPIs include engagement rates, milestone completion, and resource efficiency.');
+
+  addHeading('5. Budget Narrative', 14, '#4f46e5');
+  addParagraph(`Total budget: ${amt}`);
+  addBullet(`Personnel (${b.personnel}%): Project staff, SMEs, management.`);
+  addBullet(`Equipment & Materials (${b.equipment}%): Infrastructure and tools.`);
+  addBullet(`Operations (${b.operations}%): Logistics, outreach, admin.`);
+  addBullet(`Evaluation (${b.evaluation}%): Assessment and compliance.`);
+  y += 4;
+
+  addHeading('6. Organizational Background', 14, '#4f46e5');
+  addParagraph(`${d.orgName} has a proven track record managing federal initiatives.`);
+  d.pastPerformance.split('\n').filter(Boolean).forEach(p => addBullet(p.replace(/^-\s*/, '')));
+
+  doc.save(`${d.projectTitle.replace(/\s+/g, '_')}_Proposal.pdf`);
+  showToast('PDF downloaded!', 'success');
 });
 
+// ===== Markdown Download =====
 downloadMdBtn.addEventListener('click', () => {
-  const { orgName, projectTitle, fundingAmount, grantAgency, objectives, pastPerformance } = currentProposalData;
-  const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(fundingAmount);
-  
-  const markdownContent = `# ${projectTitle}
-**Applicant:** ${orgName}
-**Target Agency:** ${grantAgency}
-**Requested Funding:** ${formattedAmount}
+  const d = currentProposalData;
+  if (!d.projectTitle) { showToast('No proposal to export', 'error'); return; }
+  const amt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(d.fundingAmount);
+  const agency = AGENCY_TEMPLATES[d.grantAgency] || { name: d.grantAgency };
+  const b = d.budget || { personnel: 45, equipment: 25, operations: 20, evaluation: 10 };
+
+  const md = `# ${d.projectTitle}
+**Applicant:** ${d.orgName}
+**Target Agency:** ${agency.name}
+**Requested Funding:** ${amt}
+**Duration:** ${d.projectDuration || 24} months
 
 ## 1. Executive Summary
-${orgName} is seeking ${formattedAmount} from the ${grantAgency} to fund the "${projectTitle}" project. This initiative aligns directly with the agency's strategic goals by addressing critical capability gaps.
+${d.orgName} is seeking ${amt} from the ${agency.name} to fund the "${d.projectTitle}" project.
 
 ## 2. Statement of Need
-Currently, there is a pronounced deficit in resources addressing the challenges targeted by our initiative. As outlined in our objectives:
-${objectives}
+${d.objectives}
 
-## 3. Project Design and Methodology
-- **Phase 1:** Planning & Deployment
-- **Phase 2:** Execution & Scaling
-- **Phase 3:** Transition & Sustainability
+## 3. Project Design & Methodology
+${d.methodology || 'Multi-phase approach with stakeholder engagement and iterative evaluation.'}
 
 ## 4. Evaluation Plan
-A mixed-methods evaluation strategy will be employed, measuring Key Performance Indicators (KPIs) including engagement rates and milestone completion.
+Mixed-methods evaluation measuring KPIs including engagement rates and milestone completion.
 
 ## 5. Budget Narrative
-- **Personnel:** 45%
-- **Equipment & Materials:** 25%
-- **Operations & Logistics:** 20%
-- **Evaluation & Reporting:** 10%
+- **Personnel:** ${b.personnel}%
+- **Equipment & Materials:** ${b.equipment}%
+- **Operations & Logistics:** ${b.operations}%
+- **Evaluation & Reporting:** ${b.evaluation}%
 
-## 6. Organizational Background & Track Record
-${orgName} has a proven history of executing complex initiatives.
-**Past Performance Highlights:**
-${pastPerformance}
+## 6. Organizational Background
+${d.pastPerformance}
 `;
 
-  const blob = new Blob([markdownContent], { type: 'text/markdown' });
-  const url = URL.createObjectURL(blob);
+  const blob = new Blob([md], { type: 'text/markdown' });
   const a = document.createElement('a');
-  a.href = url;
-  a.download = `${projectTitle.replace(/\s+/g, '_')}_Proposal.md`;
+  a.href = URL.createObjectURL(blob);
+  a.download = `${d.projectTitle.replace(/\s+/g, '_')}_Proposal.md`;
   a.click();
-  URL.revokeObjectURL(url);
+  URL.revokeObjectURL(a.href);
+  showToast('Markdown downloaded!', 'success');
 });
 
-downloadPdfBtn.addEventListener('click', () => {
-  const { orgName, projectTitle, fundingAmount, grantAgency, objectives, pastPerformance } = currentProposalData;
-  const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(fundingAmount);
-  
-  // Construct a pure HTML string for PDF rendering. 
-  // This is 100% immune to CSS conflicts, viewport sizing, and DOM positioning issues (which cause blank pages).
-  const pdfHtml = `
-    <div style="font-family: 'Inter', sans-serif; color: #1e293b; background: #ffffff; padding: 40px; width: 800px; line-height: 1.6;">
-      <div style="border-bottom: 2px solid #e2e8f0; margin-bottom: 30px; padding-bottom: 15px;">
-        <h1 style="color: #000000; font-size: 28px; margin: 0 0 10px 0;">${projectTitle}</h1>
-        <p style="color: #475569; margin: 0; font-size: 16px;"><strong>Applicant:</strong> ${orgName} | <strong>Target:</strong> ${grantAgency}</p>
-      </div>
-      
-      <div style="margin-bottom: 25px;">
-        <h3 style="color: #4f46e5; margin-bottom: 10px; font-size: 20px;">1. Executive Summary</h3>
-        <p>${orgName} is seeking <strong>${formattedAmount}</strong> from the ${grantAgency} to fund the "${projectTitle}" project. This initiative aligns directly with the agency's strategic goals by addressing critical capability gaps. By leveraging innovative approaches, this project will deliver measurable outcomes, scaling impact efficiently across the target demographic.</p>
-      </div>
-
-      <div style="margin-bottom: 25px;">
-        <h3 style="color: #4f46e5; margin-bottom: 10px; font-size: 20px;">2. Statement of Need</h3>
-        <p>Currently, there is a pronounced deficit in resources addressing the challenges targeted by our initiative. The core issue requires immediate intervention. As outlined in our objectives:</p>
-        <p style="margin: 15px 0; padding-left: 15px; border-left: 3px solid #e2e8f0; font-style: italic;">${objectives.replace(/\n/g, '<br/>')}</p>
-        <p>Without targeted funding, these challenges will compound. Our proposal provides an evidence-based pathway to mitigate these issues and establish a sustainable framework for the future.</p>
-      </div>
-
-      <div style="margin-bottom: 25px;">
-        <h3 style="color: #4f46e5; margin-bottom: 10px; font-size: 20px;">3. Project Design and Methodology</h3>
-        <p>The <strong>${projectTitle}</strong> will be implemented in three phased stages over a 24-month performance period:</p>
-        <ul style="margin-top: 10px; padding-left: 20px;">
-          <li style="margin-bottom: 8px;"><strong>Phase 1: Planning & Deployment (Months 1-4):</strong> Stakeholder engagement, infrastructure setup, and baseline metric establishment.</li>
-          <li style="margin-bottom: 8px;"><strong>Phase 2: Execution & Scaling (Months 5-18):</strong> Direct implementation of core objectives, iterative feedback loops, and capability scaling.</li>
-          <li><strong>Phase 3: Transition & Sustainability (Months 19-24):</strong> Knowledge transfer, final reporting, and institutionalizing the framework for post-grant sustainability.</li>
-        </ul>
-      </div>
-
-      <div style="margin-bottom: 25px;">
-        <h3 style="color: #4f46e5; margin-bottom: 10px; font-size: 20px;">4. Evaluation Plan</h3>
-        <p>A mixed-methods evaluation strategy will be employed. Formative assessments will guide continuous quality improvement during Phases 1 and 2. Summative evaluations will measure total impact against the baseline metrics. Key Performance Indicators (KPIs) include engagement rates, milestone completion percentage, and resource efficiency ratios.</p>
-      </div>
-
-      <div style="margin-bottom: 25px;">
-        <h3 style="color: #4f46e5; margin-bottom: 10px; font-size: 20px;">5. Budget Narrative</h3>
-        <p>The total requested budget of <strong>${formattedAmount}</strong> is meticulously calculated to ensure high ROI. The allocation is distributed as follows:</p>
-        <ul style="margin-top: 10px; padding-left: 20px;">
-          <li style="margin-bottom: 8px;"><strong>Personnel (45%):</strong> Direct labor, project management, and specialized Subject Matter Experts (SMEs).</li>
-          <li style="margin-bottom: 8px;"><strong>Equipment & Materials (25%):</strong> Essential technological infrastructure and implementation tools.</li>
-          <li style="margin-bottom: 8px;"><strong>Operations & Logistics (20%):</strong> Deployment costs, outreach, and administrative overhead.</li>
-          <li><strong>Evaluation & Reporting (10%):</strong> Independent assessment and compliance monitoring.</li>
-        </ul>
-      </div>
-
-      <div style="margin-bottom: 25px;">
-        <h3 style="color: #4f46e5; margin-bottom: 10px; font-size: 20px;">6. Organizational Background & Track Record</h3>
-        <p><strong>${orgName}</strong> has a proven history of executing complex initiatives and managing federal/state grants with strict compliance and outstanding results.</p>
-        <p style="margin: 15px 0;"><strong>Past Performance Highlights:</strong><br/>${pastPerformance.replace(/\n/g, '<br/>')}</p>
-        <p>Our institutional infrastructure provides robust financial controls and subject matter expertise to ensure the success of this proposed project.</p>
-      </div>
-    </div>
-  `;
-
-  const opt = {
-    margin:       0.5,
-    filename:     `${projectTitle ? projectTitle.replace(/\s+/g, '_') : 'Proposal'}.pdf`,
-    image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true },
-    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
-    pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
-  };
-  
-  html2pdf().set(opt).from(pdfHtml).save();
-});
-
-// Copy to Clipboard
+// ===== Copy =====
 copyBtn.addEventListener('click', () => {
-  const text = documentContent.innerText;
-  navigator.clipboard.writeText(text).then(() => {
-    const originalHTML = copyBtn.innerHTML;
-    copyBtn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#22c55e" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>';
-    setTimeout(() => {
-      copyBtn.innerHTML = originalHTML;
-    }, 2000);
-  });
+  navigator.clipboard.writeText(documentContent.innerText).then(() => showToast('Copied to clipboard!', 'success'));
 });
+
+// ===== Init =====
+updateWizard();
+updateBudgetTotal();
+loadHistory();
