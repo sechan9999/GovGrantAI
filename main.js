@@ -217,8 +217,9 @@ downloadPdfBtn.addEventListener('click', () => {
   
   // Style the wrapper to ensure full height and white background for html2canvas
   wrapper.style.position = 'absolute';
-  wrapper.style.top = '-9999px';
+  wrapper.style.top = '0'; // Fixed: -9999px causes blank render in html2canvas
   wrapper.style.left = '0';
+  wrapper.style.zIndex = '-1000'; // Hide behind main content
   wrapper.style.width = '800px'; // Standard width for letter size
   wrapper.style.background = '#ffffff';
   wrapper.style.padding = '40px';
@@ -250,7 +251,7 @@ downloadPdfBtn.addEventListener('click', () => {
     margin:       0.5,
     filename:     `${currentProposalData.projectTitle ? currentProposalData.projectTitle.replace(/\s+/g, '_') : 'Proposal'}.pdf`,
     image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 },
+    html2canvas:  { scale: 2, useCORS: true, windowWidth: 800, scrollY: 0 },
     jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
     pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
   };
