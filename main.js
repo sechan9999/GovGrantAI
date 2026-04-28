@@ -208,25 +208,56 @@ ${pastPerformance}
 });
 
 downloadPdfBtn.addEventListener('click', () => {
-  const element = document.getElementById('proposal-export-area');
-  const opt = {
-    margin:       1,
-    filename:     `${currentProposalData.projectTitle.replace(/\s+/g, '_')}_Proposal.pdf`,
-    image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true },
-    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-  };
-
-  // Add temporary style for PDF printing (dark mode can look bad in PDF, so we override slightly)
-  element.style.color = '#000';
-  element.style.background = '#fff';
-  element.style.padding = '20px';
+  const originalElement = document.getElementById('proposal-export-area');
   
-  html2pdf().set(opt).from(element).save().then(() => {
-    // Revert temporary style
-    element.style.color = '';
-    element.style.background = '';
-    element.style.padding = '';
+  // Create a clone to avoid affecting the UI
+  const wrapper = document.createElement('div');
+  const clone = originalElement.cloneNode(true);
+  wrapper.appendChild(clone);
+  
+  // Style the wrapper to ensure full height and white background for html2canvas
+  wrapper.style.position = 'absolute';
+  wrapper.style.top = '-9999px';
+  wrapper.style.left = '0';
+  wrapper.style.width = '800px'; // Standard width for letter size
+  wrapper.style.background = '#ffffff';
+  wrapper.style.padding = '40px';
+  wrapper.style.color = '#000000';
+  wrapper.style.fontFamily = 'Inter, sans-serif';
+  wrapper.style.lineHeight = '1.6';
+
+  // Override dark mode CSS variables and explicit colors for descendants
+  const allElements = wrapper.querySelectorAll('*');
+  allElements.forEach(el => {
+    if (el.tagName === 'H1') {
+      el.style.background = 'none';
+      el.style.webkitBackgroundClip = 'initial';
+      el.style.webkitTextFillColor = 'initial';
+      el.style.color = '#000000';
+      el.style.borderBottom = '2px solid #e2e8f0';
+    } else if (el.tagName === 'H3') {
+      el.style.color = '#4f46e5'; // Keep primary accent for headers
+      el.style.marginTop = '1.5rem';
+    } else {
+      el.style.color = '#1e293b'; // Slate 800 for readable text instead of faint grey
+    }
+  });
+
+  // Temporarily add to body so html2canvas can measure full height (fixes truncation)
+  document.body.appendChild(wrapper);
+
+  const opt = {
+    margin:       0.5,
+    filename:     `${currentProposalData.projectTitle ? currentProposalData.projectTitle.replace(/\s+/g, '_') : 'Proposal'}.pdf`,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 },
+    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
+    pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+  };
+  
+  html2pdf().set(opt).from(wrapper).save().then(() => {
+    // Cleanup
+    document.body.removeChild(wrapper);
   });
 });
 
