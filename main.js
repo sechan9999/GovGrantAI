@@ -208,58 +208,75 @@ ${pastPerformance}
 });
 
 downloadPdfBtn.addEventListener('click', () => {
-  const originalElement = document.getElementById('proposal-export-area');
+  const { orgName, projectTitle, fundingAmount, grantAgency, objectives, pastPerformance } = currentProposalData;
+  const formattedAmount = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(fundingAmount);
   
-  // Create a clone to avoid affecting the UI
-  const wrapper = document.createElement('div');
-  const clone = originalElement.cloneNode(true);
-  wrapper.appendChild(clone);
-  
-  // Style the wrapper to ensure full height and white background for html2canvas
-  wrapper.style.position = 'absolute';
-  wrapper.style.top = '0'; // Fixed: -9999px causes blank render in html2canvas
-  wrapper.style.left = '0';
-  wrapper.style.zIndex = '-1000'; // Hide behind main content
-  wrapper.style.width = '800px'; // Standard width for letter size
-  wrapper.style.background = '#ffffff';
-  wrapper.style.padding = '40px';
-  wrapper.style.color = '#000000';
-  wrapper.style.fontFamily = 'Inter, sans-serif';
-  wrapper.style.lineHeight = '1.6';
+  // Construct a pure HTML string for PDF rendering. 
+  // This is 100% immune to CSS conflicts, viewport sizing, and DOM positioning issues (which cause blank pages).
+  const pdfHtml = `
+    <div style="font-family: 'Inter', sans-serif; color: #1e293b; background: #ffffff; padding: 40px; width: 800px; line-height: 1.6;">
+      <div style="border-bottom: 2px solid #e2e8f0; margin-bottom: 30px; padding-bottom: 15px;">
+        <h1 style="color: #000000; font-size: 28px; margin: 0 0 10px 0;">${projectTitle}</h1>
+        <p style="color: #475569; margin: 0; font-size: 16px;"><strong>Applicant:</strong> ${orgName} | <strong>Target:</strong> ${grantAgency}</p>
+      </div>
+      
+      <div style="margin-bottom: 25px;">
+        <h3 style="color: #4f46e5; margin-bottom: 10px; font-size: 20px;">1. Executive Summary</h3>
+        <p>${orgName} is seeking <strong>${formattedAmount}</strong> from the ${grantAgency} to fund the "${projectTitle}" project. This initiative aligns directly with the agency's strategic goals by addressing critical capability gaps. By leveraging innovative approaches, this project will deliver measurable outcomes, scaling impact efficiently across the target demographic.</p>
+      </div>
 
-  // Override dark mode CSS variables and explicit colors for descendants
-  const allElements = wrapper.querySelectorAll('*');
-  allElements.forEach(el => {
-    if (el.tagName === 'H1') {
-      el.style.background = 'none';
-      el.style.webkitBackgroundClip = 'initial';
-      el.style.webkitTextFillColor = 'initial';
-      el.style.color = '#000000';
-      el.style.borderBottom = '2px solid #e2e8f0';
-    } else if (el.tagName === 'H3') {
-      el.style.color = '#4f46e5'; // Keep primary accent for headers
-      el.style.marginTop = '1.5rem';
-    } else {
-      el.style.color = '#1e293b'; // Slate 800 for readable text instead of faint grey
-    }
-  });
+      <div style="margin-bottom: 25px;">
+        <h3 style="color: #4f46e5; margin-bottom: 10px; font-size: 20px;">2. Statement of Need</h3>
+        <p>Currently, there is a pronounced deficit in resources addressing the challenges targeted by our initiative. The core issue requires immediate intervention. As outlined in our objectives:</p>
+        <p style="margin: 15px 0; padding-left: 15px; border-left: 3px solid #e2e8f0; font-style: italic;">${objectives.replace(/\n/g, '<br/>')}</p>
+        <p>Without targeted funding, these challenges will compound. Our proposal provides an evidence-based pathway to mitigate these issues and establish a sustainable framework for the future.</p>
+      </div>
 
-  // Temporarily add to body so html2canvas can measure full height (fixes truncation)
-  document.body.appendChild(wrapper);
+      <div style="margin-bottom: 25px;">
+        <h3 style="color: #4f46e5; margin-bottom: 10px; font-size: 20px;">3. Project Design and Methodology</h3>
+        <p>The <strong>${projectTitle}</strong> will be implemented in three phased stages over a 24-month performance period:</p>
+        <ul style="margin-top: 10px; padding-left: 20px;">
+          <li style="margin-bottom: 8px;"><strong>Phase 1: Planning & Deployment (Months 1-4):</strong> Stakeholder engagement, infrastructure setup, and baseline metric establishment.</li>
+          <li style="margin-bottom: 8px;"><strong>Phase 2: Execution & Scaling (Months 5-18):</strong> Direct implementation of core objectives, iterative feedback loops, and capability scaling.</li>
+          <li><strong>Phase 3: Transition & Sustainability (Months 19-24):</strong> Knowledge transfer, final reporting, and institutionalizing the framework for post-grant sustainability.</li>
+        </ul>
+      </div>
+
+      <div style="margin-bottom: 25px;">
+        <h3 style="color: #4f46e5; margin-bottom: 10px; font-size: 20px;">4. Evaluation Plan</h3>
+        <p>A mixed-methods evaluation strategy will be employed. Formative assessments will guide continuous quality improvement during Phases 1 and 2. Summative evaluations will measure total impact against the baseline metrics. Key Performance Indicators (KPIs) include engagement rates, milestone completion percentage, and resource efficiency ratios.</p>
+      </div>
+
+      <div style="margin-bottom: 25px;">
+        <h3 style="color: #4f46e5; margin-bottom: 10px; font-size: 20px;">5. Budget Narrative</h3>
+        <p>The total requested budget of <strong>${formattedAmount}</strong> is meticulously calculated to ensure high ROI. The allocation is distributed as follows:</p>
+        <ul style="margin-top: 10px; padding-left: 20px;">
+          <li style="margin-bottom: 8px;"><strong>Personnel (45%):</strong> Direct labor, project management, and specialized Subject Matter Experts (SMEs).</li>
+          <li style="margin-bottom: 8px;"><strong>Equipment & Materials (25%):</strong> Essential technological infrastructure and implementation tools.</li>
+          <li style="margin-bottom: 8px;"><strong>Operations & Logistics (20%):</strong> Deployment costs, outreach, and administrative overhead.</li>
+          <li><strong>Evaluation & Reporting (10%):</strong> Independent assessment and compliance monitoring.</li>
+        </ul>
+      </div>
+
+      <div style="margin-bottom: 25px;">
+        <h3 style="color: #4f46e5; margin-bottom: 10px; font-size: 20px;">6. Organizational Background & Track Record</h3>
+        <p><strong>${orgName}</strong> has a proven history of executing complex initiatives and managing federal/state grants with strict compliance and outstanding results.</p>
+        <p style="margin: 15px 0;"><strong>Past Performance Highlights:</strong><br/>${pastPerformance.replace(/\n/g, '<br/>')}</p>
+        <p>Our institutional infrastructure provides robust financial controls and subject matter expertise to ensure the success of this proposed project.</p>
+      </div>
+    </div>
+  `;
 
   const opt = {
     margin:       0.5,
-    filename:     `${currentProposalData.projectTitle ? currentProposalData.projectTitle.replace(/\s+/g, '_') : 'Proposal'}.pdf`,
+    filename:     `${projectTitle ? projectTitle.replace(/\s+/g, '_') : 'Proposal'}.pdf`,
     image:        { type: 'jpeg', quality: 0.98 },
-    html2canvas:  { scale: 2, useCORS: true, windowWidth: 800, scrollY: 0 },
+    html2canvas:  { scale: 2, useCORS: true },
     jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
     pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
   };
   
-  html2pdf().set(opt).from(wrapper).save().then(() => {
-    // Cleanup
-    document.body.removeChild(wrapper);
-  });
+  html2pdf().set(opt).from(pdfHtml).save();
 });
 
 // Copy to Clipboard
